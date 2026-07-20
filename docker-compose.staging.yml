@@ -1,0 +1,75 @@
+services:
+  # Next.js Frontend Application
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=https://api-stage.affvance.com/api/v1
+        - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+    container_name: affvance_frontend_staging
+    expose:
+      - "3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=staging
+      - NEXT_PUBLIC_API_URL=https://api-stage.affvance.com/api/v1
+      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+    networks:
+      - traefik_proxy
+    labels:
+      - "traefik.enable=true"
+      # Staging domain
+      - "traefik.http.routers.affvance-frontend-staging.rule=Host(`stage.affvance.com`)"
+      - "traefik.http.routers.affvance-frontend-staging.entrypoints=websecure"
+      - "traefik.http.routers.affvance-frontend-staging.tls.certresolver=letsencrypt"
+      - "traefik.http.services.affvance-frontend-staging.loadbalancer.server.port=3000"
+      - "traefik.docker.network=traefik_proxy"
+      # Main domain (temporary - points to staging)
+      - "traefik.http.routers.affvance-frontend-production.rule=Host(`affvance.com`)"
+      - "traefik.http.routers.affvance-frontend-production.entrypoints=websecure"
+      - "traefik.http.routers.affvance-frontend-production.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.affvance-frontend-production.service=affvance-frontend-staging"
+      # WWW redirect for main domain
+      - "traefik.http.routers.affvance-frontend-production-www.rule=Host(`www.affvance.com`)"
+      - "traefik.http.routers.affvance-frontend-production-www.entrypoints=websecure"
+      - "traefik.http.routers.affvance-frontend-production-www.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.affvance-frontend-production-www.middlewares=redirect-to-non-www-prod@docker"
+      - "traefik.http.middlewares.redirect-to-non-www-prod.redirectregex.regex=^https://www\\.affvance\\.com/(.*)"
+      - "traefik.http.middlewares.redirect-to-non-www-prod.redirectregex.replacement=https://affvance.com/$${1}"
+      - "traefik.http.middlewares.redirect-to-non-www-prod.redirectregex.permanent=true"
+      # WWW redirect for staging domain
+      - "traefik.http.routers.affvance-frontend-staging-www.rule=Host(`www.stage.affvance.com`)"
+      - "traefik.http.routers.affvance-frontend-staging-www.entrypoints=websecure"
+      - "traefik.http.routers.affvance-frontend-staging-www.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.affvance-frontend-staging-www.middlewares=redirect-to-non-www@docker"
+      - "traefik.http.middlewares.redirect-to-non-www.redirectregex.regex=^https://www\\.(.+)"
+      - "traefik.http.middlewares.redirect-to-non-www.redirectregex.replacement=https://$${1}"
+      - "traefik.http.middlewares.redirect-to-non-www.redirectregex.permanent=true"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+networks:
+  traefik_proxy:
+    external: true

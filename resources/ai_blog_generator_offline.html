@@ -1,0 +1,670 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Informative Content Blog Generator — Offline Prototype</title>
+<style>
+  :root{
+    --bg:#fafafa;--card:#fff;--muted:#6b7280;--text:#111827;--ring:#e5e7eb;--accent:#111827;
+    --green:#16a34a;--amber:#d97706;--violet:#6d28d9;--red:#dc2626;--blue:#2563eb;
+  }
+  *{box-sizing:border-box} html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font:14px/1.4 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue","Noto Sans",Arial}
+  .container{max-width:1100px;margin:0 auto;padding:24px}
+  .grid{display:grid;grid-template-columns:1fr;gap:24px}
+  @media(min-width:1000px){.grid{grid-template-columns:2fr 1fr}}
+  header{position:sticky;top:0;backdrop-filter:saturate(1.2) blur(6px);background:#ffffffb3;border-bottom:1px solid var(--ring);z-index:10}
+  header .bar{display:flex;align-items:center;justify-content:space-between;max-width:1100px;margin:0 auto;padding:10px 24px}
+  .logo{display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:var(--accent);color:#fff;font-weight:700}
+  .muted{color:var(--muted)} .small{font-size:12px}
+  .card{background:var(--card);border:1px solid var(--ring);border-radius:16px;box-shadow:0 1px 2px #0000000d}
+  .card-h{display:flex;gap:12px;align-items:flex-start;padding:18px;border-bottom:1px solid var(--ring)}
+  .card-b{padding:18px}
+  .btn{display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 14px;border-radius:12px;border:0;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
+  .btn:hover{filter:brightness(0.95)} .btn:disabled{background:#e5e7eb;color:#9ca3af;cursor:not-allowed}
+  .gbtn{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 12px;border-radius:10px;border:1px solid var(--ring);background:#fff;cursor:pointer}
+  .gbtn:hover{background:#f9fafb}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .tag{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;font-size:12px;background:#f3f4f6;color:#374151}
+  .tag.green{background:#dcfce7;color:#166534}.tag.amber{background:#ffedd5;color:#92400e}.tag.violet{background:#ede9fe;color:#5b21b6}.tag.blue{background:#dbeafe;color:#1e40af}.tag.red{background:#fee2e2;color:#991b1b}
+  label.l{display:grid;gap:6px;font-size:13px} input.t, select.t, textarea.t{border:1px solid var(--ring);border-radius:10px;padding:10px 12px;font:inherit;background:#fff}
+  textarea.t{min-height:84px}
+  .switch{display:inline-flex;gap:10px;align-items:center}
+  .switch input{display:none}
+  .switch .trk{width:42px;height:24px;background:#d1d5db;border-radius:999px;padding:3px;position:relative;transition:.2s}
+  .switch .dot{width:18px;height:18px;background:#fff;border-radius:999px;transform:translateX(0);transition:.2s}
+  .switch input:checked + .trk .dot{transform:translateX(18px)} .switch input:checked + .trk{background:#111827}
+  .divider{border-top:1px solid var(--ring);margin-top:8px;padding-top:10px}
+  .steps{display:grid;gap:10px}
+  @media(min-width:700px){.steps{grid-template-columns:repeat(5,1fr)}}
+  .step{display:flex;gap:10px;align-items:center}
+  .dot{width:24px;height:24px;border-radius:999px;display:grid;place-items:center;font-size:12px;font-weight:700;background:#e5e7eb;color:#374151}
+  .dot.active{background:#111827;color:#fff}.dot.done{background:#16a34a;color:#fff}
+  .jobs .job{border:1px solid var(--ring);border-radius:12px;padding:14px}
+  .aside{position:fixed;inset:0;display:none}.aside.open{display:block}
+  .shade{position:absolute;inset:0;background:#0006}
+  .drawer{position:absolute;right:0;top:0;height:100%;width:min(460px,100%);background:#fff;border-left:1px solid var(--ring)}
+  .drawer-h{display:flex;align-items:center;justify-content:space-between;padding:16px;border-bottom:1px solid var(--ring)}
+  .drawer-b{padding:16px;overflow:auto;height:calc(100% - 57px)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .warn{color:#b45309}
+  footer{max-width:1100px;margin:0 auto;padding:24px;text-align:center;color:#6b7280;font-size:12px}
+  /* simple tooltip title style fallback via title attr */
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="row">
+      <div class="logo">✨</div>
+      <div>
+        <div style="font-weight:700">AI Informative Content Blog Generator</div>
+        <div class="small muted">For marketers & creators — humanized, SEO‑ready articles</div>
+      </div>
+    </div>
+    <div class="row">
+      <button class="gbtn" title="Settings">⚙️ Settings</button>
+      <button class="gbtn" title="Compliance">🛡️ Compliance</button>
+    </div>
+  </div>
+</header>
+
+<div class="container grid">
+  <!-- Left column -->
+  <div class="col-left grid" style="gap:24px">
+    <div class="card">
+      <div class="card-h"><div class="tag">🪄</div>
+        <div><div style="font-weight:700">Generate SEO‑optimized, rank‑ready articles</div>
+        <div class="small muted">Provide one or many long‑tail keywords. Optionally set concerns in Advanced.</div></div>
+      </div>
+      <div class="card-b" id="formArea">
+        <!-- Mode switch -->
+        <div class="row" style="justify-content:space-between;margin-bottom:10px">
+          <div class="row small">
+            <span class="muted">Mode:</span>
+            <div class="row" style="background:#f3f4f6;border-radius:10px;padding:3px">
+              <button id="modeAuto" class="gbtn">🚀 Autopilot</button>
+              <button id="modeCo" class="gbtn">🤖 Co‑pilot</button>
+            </div>
+          </div>
+          <div class="row small muted" id="modeNote"><span class="tag green">Hands‑free</span><span>Research → Draft → Optimize → Publish automatically to your CMS</span></div>
+        </div>
+
+        <!-- Keywords -->
+        <label class="l"><span>Long‑tail keywords</span>
+          <textarea id="kw" class="t" placeholder="One per line (e.g.
+'best solar inverter for small homes in bangladesh'
+'ai content workflow for ecommerce product pages')"></textarea>
+        </label>
+        <div class="row small muted" style="justify-content:space-between;margin-top:6px">
+          <div id="kwCount">0 keywords detected</div>
+          <div>Everything else is automated unless overridden</div>
+        </div>
+
+        <!-- Advanced toggle -->
+        <div style="margin-top:12px">
+          <button id="advToggle" class="gbtn" style="width:100%;justify-content:space-between">
+            <span>Advanced (optional) — concerns, media & co‑pilot</span><span>▾</span>
+          </button>
+          <div id="advPanel" style="display:none;margin-top:12px">
+            <div class="grid2">
+              <!-- Content -->
+              <div class="card" style="border-style:dashed">
+                <div class="card-b">
+                  <div style="font-weight:600;margin-bottom:8px">Content preferences</div>
+                  <label class="l">Tone of voice
+                    <select class="t adv" data-key="tone">
+                      <option>Auto</option><option>Friendly</option><option>Professional</option><option>Conversational</option><option>Technical</option>
+                    </select>
+                  </label>
+                  <label class="l">Primary audience/persona
+                    <input class="t adv" data-key="audience" placeholder="e.g., SMB owners in Dhaka">
+                  </label>
+                  <label class="l">Reading level
+                    <select class="t adv" data-key="readingLevel">
+                      <option>Auto</option><option>Grade 8</option><option>Grade 10</option><option>College</option>
+                    </select>
+                  </label>
+                  <label class="l">Locale / Language
+                    <input class="t adv" data-key="locale" placeholder="Auto or e.g., en-BD, bn-BD">
+                  </label>
+                  <div class="grid2">
+                    <label class="l">Min words<input type="number" class="t adv" data-key="wordMin"></label>
+                    <label class="l">Max words<input type="number" class="t adv" data-key="wordMax"></label>
+                  </div>
+                  <label class="l">Outline depth
+                    <select class="t adv" data-key="outlineDepth">
+                      <option>Auto</option><option>Shallow</option><option>Standard</option><option>Deep</option>
+                    </select>
+                  </label>
+                  <label class="l">Brand voice guidelines<textarea class="t adv" data-key="brandVoice" placeholder="Key phrases, do/don'ts"></textarea></label>
+                  <label class="l">Call‑to‑action (CTA)<input class="t adv" data-key="cta" placeholder="e.g., Book a demo"></label>
+                  <label class="l">Competitor URLs (one per line)<textarea class="t adv" data-key="competitors" placeholder="https://example.com/post
+https://other.com/guide"></textarea></label>
+                  <label class="l">Humanize level
+                    <select class="t adv" data-key="humanize">
+                      <option>Conservative</option><option selected>Balanced</option><option>Bold</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+              <!-- SEO -->
+              <div class="card" style="border-style:dashed">
+                <div class="card-b">
+                  <div style="font-weight:600;margin-bottom:8px">SEO preferences</div>
+                  <label class="l">Slug override<input class="t adv" data-key="slugOverride" placeholder="Auto or custom-slug"></label>
+                  <label class="l">Meta title override<input class="t adv" data-key="metaTitleOverride" placeholder="Auto or custom"></label>
+                  <label class="l">Meta description override<textarea class="t adv" data-key="metaDescOverride" placeholder="Auto or custom"></textarea></label>
+                  <label class="l">Schema type
+                    <select class="t adv" data-key="schemaType">
+                      <option>Auto</option><option>Article</option><option>BlogPosting</option><option>HowTo</option><option>FAQ</option>
+                    </select>
+                  </label>
+                  <label class="l">Max external links<input type="number" class="t adv" data-key="externalLinksMax"></label>
+                  <label class="l">Internal linking
+                    <select class="t adv" data-key="internalLinking">
+                      <option>Auto</option><option>Aggressive</option><option>Moderate</option><option>Minimal</option>
+                    </select>
+                  </label>
+                  <label class="l">Canonical URL<input class="t adv" data-key="canonicalUrl" placeholder="https://..."></label>
+                  <label class="l">Author name<input class="t adv" data-key="author" placeholder="Auto or specific"></label>
+                </div>
+              </div>
+              <!-- Images -->
+              <div class="card" style="border-style:dashed">
+                <div class="card-b">
+                  <div style="font-weight:600;margin-bottom:8px">Media — Images</div>
+                  <label class="l">Image source
+                    <select class="t adv" data-key="mediaSource">
+                      <option>Auto</option><option>AI</option><option>Royalty-free</option><option>Other URLs</option><option>Upload</option>
+                    </select>
+                  </label>
+                  <div id="rfWrap" style="display:none">
+                    <label class="l">Stock provider
+                      <select class="t adv" data-key="stockProvider">
+                        <option>Auto</option><option>Unsplash</option><option>Pexels</option><option>Pixabay</option><option>Freepik</option><option>Other</option>
+                      </select>
+                    </label>
+                    <label class="l">License
+                      <select class="t adv" data-key="stockLicense">
+                        <option>Auto</option><option>CC0</option><option>Unsplash License</option><option>Pixabay License</option><option>RF (check terms)</option>
+                      </select>
+                    </label>
+                    <label class="switch"><input type="checkbox" class="adv" data-key="imageAttribution"><span class="trk"><span class="dot"></span></span><span>Add attribution caption</span></label>
+                  </div>
+                  <div id="urlWrap" style="display:none">
+                    <label class="l">Image URLs (one per line)<textarea class="t adv" data-key="otherImageUrls" placeholder="https://...
+https://..."></textarea></label>
+                  </div>
+                  <div id="upWrap" style="display:none">
+                    <label class="l">Upload images
+                      <input type="file" id="fileInput" multiple>
+                      <div class="small muted" id="fileList"></div>
+                    </label>
+                  </div>
+                  <div class="grid2">
+                    <label class="l">Max images<input type="number" class="t adv" data-key="imageCount"></label>
+                    <label class="l">Alt text strategy
+                      <select class="t adv" data-key="imageAltStrategy">
+                        <option>Auto</option><option>Descriptive</option><option>CTA-aligned</option><option>Keyword-variant</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label class="l">Image style (for AI)<input class="t adv" data-key="imageStyle" placeholder="Auto, flat, photoreal, etc."></label>
+                </div>
+              </div>
+              <!-- YouTube -->
+              <div class="card" style="border-style:dashed">
+                <div class="card-b">
+                  <div style="font-weight:600;margin-bottom:8px">Media — YouTube</div>
+                  <label class="l">Video mode
+                    <select class="t adv" data-key="youtubeMode">
+                      <option>None</option><option>Auto from keyword</option><option>Specific URLs</option>
+                    </select>
+                  </label>
+                  <div id="ytUrls" style="display:none">
+                    <label class="l">YouTube URLs (one per line)<textarea class="t adv" data-key="youtubeUrls" placeholder="https://youtube.com/watch?v=..."></textarea></label>
+                  </div>
+                  <label class="l">Embed position
+                    <select class="t adv" data-key="youtubePosition">
+                      <option>Auto</option><option>Top</option><option>Middle</option><option>Bottom</option>
+                    </select>
+                  </label>
+                  <div class="small muted row"><span>▶️</span><span>We’ll embed with titles, transcripts (if available), and proper attribution.</span></div>
+                </div>
+              </div>
+              <!-- Co-pilot -->
+              <div class="card" style="border-style:dashed">
+                <div class="card-b">
+                  <div style="font-weight:600;margin-bottom:8px">Co‑pilot — approval guardrails & checklist</div>
+                  <div class="grid2">
+                    <label class="l">Min SEO score<input type="number" class="t adv" data-key="co_minSeoScore"></label>
+                    <label class="l">Readability target
+                      <select class="t adv" data-key="co_readability">
+                        <option>Auto</option><option>Easy</option><option>Standard</option><option>Expert</option>
+                      </select>
+                    </label>
+                    <label class="l">Required H2 count<input type="number" class="t adv" data-key="co_requiredH2Count"></label>
+                    <label class="l">Required FAQ count<input type="number" class="t adv" data-key="co_requiredFAQCount"></label>
+                    <label class="l">Required internal links<input type="number" class="t adv" data-key="co_requiredInternalLinks"></label>
+                  </div>
+                  <div class="row" style="margin:8px 0;gap:18px">
+                    <label class="switch"><input type="checkbox" class="adv" data-key="co_requireTOC"><span class="trk"><span class="dot"></span></span><span>Must include TOC</span></label>
+                    <label class="switch"><input type="checkbox" class="adv" data-key="co_requireFAQ"><span class="trk"><span class="dot"></span></span><span>Must include FAQ</span></label>
+                    <label class="switch"><input type="checkbox" class="adv" data-key="co_requireConclusion"><span class="trk"><span class="dot"></span></span><span>Must include conclusion</span></label>
+                  </div>
+                  <label class="l">CTA placement
+                    <select class="t adv" data-key="co_ctaPlacement">
+                      <option>Auto</option><option>Top</option><option>Middle</option><option>Bottom</option>
+                    </select>
+                  </label>
+                  <label class="switch"><input type="checkbox" class="adv" data-key="co_requireCitations"><span class="trk"><span class="dot"></span></span><span>Require citations for facts/claims</span></label>
+                  <label class="l">Fresh data since (year)<input class="t adv" data-key="co_freshDataSince" placeholder="Auto or e.g., 2023"></label>
+                  <label class="l">Prohibited phrases<textarea class="t adv" data-key="co_prohibitedPhrases" placeholder="comma,separated,phrases"></textarea></label>
+                  <label class="l">Notes to editor<textarea class="t adv" data-key="co_notesToEditor" placeholder="Anything reviewers must check before publishing"></textarea></label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Destinations & automation flags -->
+        <div class="grid2" style="margin-top:12px">
+          <div>
+            <div class="small" style="font-weight:600;margin-bottom:6px">Publish to</div>
+            <div class="row">
+              <button id="toWp" class="gbtn">🌐 WordPress</button>
+              <button id="toBl" class="gbtn">📘 Blogger</button>
+              <button class="gbtn">🔗 Connect site</button>
+            </div>
+          </div>
+          <div>
+            <div class="small" style="font-weight:600;margin-bottom:6px">Automation (default)</div>
+            <div class="grid2">
+              <label class="switch small"><input type="checkbox" checked disabled><span class="trk"><span class="dot"></span></span><span>Auto SEO & Meta</span></label>
+              <label class="switch small"><input type="checkbox" checked disabled><span class="trk"><span class="dot"></span></span><span>Internal linking</span></label>
+              <label class="switch small"><input type="checkbox" checked disabled><span class="trk"><span class="dot"></span></span><span>Schema markup</span></label>
+              <label class="switch small"><input type="checkbox" checked disabled><span class="trk"><span class="dot"></span></span><span>AI images</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="row" style="justify-content:space-between;margin-top:12px">
+          <div class="small muted">Tip: Paste multiple keywords to create unique articles for each. Leave Advanced empty to keep it fully automated.</div>
+          <div class="row">
+            <button id="clearBtn" class="gbtn">🗑️ Clear</button>
+            <button id="genBtn" class="btn">▶️ Generate & Publish</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Jobs / timeline -->
+    <div class="card">
+      <div class="card-h"><div class="tag">✅</div><div><div style="font-weight:700">Batch progress</div><div class="small muted">Track research → drafting → optimization → publishing for each keyword</div></div></div>
+      <div class="card-b jobs" id="jobs">
+        <div class="small muted">No jobs yet. Generate articles to see progress.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right column -->
+  <div class="col-right grid" style="gap:24px">
+    <div class="card">
+      <div class="card-h"><div class="tag">🤖</div><div><div style="font-weight:700">What Autopilot & Co‑pilot do</div><div class="small muted">Choose the flow that matches your team’s speed and control</div></div></div>
+      <div class="card-b small">
+        <div class="row" style="align-items:flex-start"><span class="tag green">Autopilot</span><div class="muted">Hands‑free. We generate and publish to your connected CMS. Great for campaign bursts and backlogs.</div></div>
+        <div class="row" style="align-items:flex-start;margin-top:6px"><span class="tag blue">Co‑pilot</span><div class="muted">We generate drafts and SEO meta; you add guardrails & media; approve before publishing.</div></div>
+        <div class="divider"></div>
+        <ul class="small muted" style="padding-left:18px;margin:6px 0">
+          <li>Only input required: <b>long‑tail keyword(s)</b>.</li>
+          <li>Use <b>Advanced</b> to capture concerns, guardrails, images & YouTube.</li>
+          <li>Unique article per keyword when multiple are provided.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><div class="tag">📄</div><div><div style="font-weight:700">SEO meta preview</div><div class="small muted">Live example from your first keyword</div></div></div>
+      <div class="card-b" id="previewWrap"><div class="small muted">Add a keyword to see a sample preview.</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><div class="tag">🖼️</div><div><div style="font-weight:700">Media policy note</div><div class="small muted">Licensing & attribution guidance</div></div></div>
+      <div class="card-b small">
+        <ul style="padding-left:18px;margin:6px 0" class="muted">
+          <li><b>Royalty‑free</b>: verify provider license; some require attribution or forbid redistribution.</li>
+          <li><b>AI images</b>: avoid trademarks/people without consent; review usage rights.</li>
+          <li><b>YouTube</b>: embeds follow YouTube TOS; include titles and source links.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><div class="tag">🛡️</div><div><div style="font-weight:700">Developer tests</div><div class="small muted">Sanity checks (keywords, slugify, preview, overrides, media)</div></div></div>
+      <div class="card-b small" id="tests"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Review Drawer -->
+<div class="aside" id="aside">
+  <div class="shade" id="shade"></div>
+  <div class="drawer">
+    <div class="drawer-h">
+      <div>
+        <div class="small muted">Review draft</div>
+        <div id="drawerTitle" style="font-weight:700"></div>
+      </div>
+      <button class="gbtn" id="closeDrawer">✖️ Close</button>
+    </div>
+    <div class="drawer-b small" id="drawerBody"></div>
+  </div>
+</div>
+
+<footer>© <span id="year"></span> AI Informative Content Blog Generator · Offline Prototype</footer>
+
+<script>
+  // ---------- Utilities ----------
+  const PIPELINE_STEPS = [
+    "SERP & intent research",
+    "Outline & entities",
+    "Draft article",
+    "SEO optimize (meta/links/schema)",
+    "Publish",
+  ];
+  function slugify(str){return String(str).toLowerCase().replace(/[^a-z0-9\s-]/g,"").trim().replace(/\s+/g,"-").slice(0,80)}
+  function cap(s){return s? s.charAt(0).toUpperCase()+s.slice(1): s}
+  function parseKeywords(input){return String(input).split(/\n|,/).map(s=>s.trim()).filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i)}
+  function deepEqual(a,b){try{return JSON.stringify(a)===JSON.stringify(b)}catch{return a===b}}
+  function cleanOverrides(obj, defaults){
+    const out={};
+    for(const k in obj){
+      const v=obj[k];
+      const isEmpty = v==="" || v==null || (typeof v==="string" && v.toLowerCase()==="auto");
+      if(isEmpty) continue;
+      if(defaults && deepEqual(v, defaults[k])) continue;
+      out[k]=v;
+    }
+    return out;
+  }
+  function fakePreview(kw,ov={}){
+    return {
+      title: ov.metaTitleOverride || `The Ultimate Guide to ${cap(kw)}`,
+      slug: ov.slugOverride || slugify(kw),
+      description: ov.metaDescOverride || `Actionable, humanized insights on ${kw} crafted for search intent and readability.`,
+      wordCount: Number(ov.wordMax || 1650),
+      readingMins: 8,
+      seoScore: 92,
+      outline: [
+        "What is it and why it matters",
+        "Search intent & audience personas",
+        "Step-by-step implementation",
+        "Common pitfalls & FAQs",
+        "Tools, templates & checklist",
+      ],
+      entities: ["how to","benefits","cost","tools","best practices"]
+    }
+  }
+
+  const defaultAdv = {
+    tone:"Auto",audience:"",readingLevel:"Auto",locale:"Auto",
+    wordMin:"",wordMax:"",outlineDepth:"Auto",brandVoice:"",cta:"",
+    competitors:"",humanize:"Balanced",
+    slugOverride:"",metaTitleOverride:"",metaDescOverride:"",schemaType:"Auto",
+    externalLinksMax:"",internalLinking:"Auto",canonicalUrl:"",author:"",
+    category:"",tags:"",schedule:"Immediate",scheduleAt:"",
+    includeImages:true,imageStyle:"Auto",plagiarismCheck:true,
+    mediaSource:"Auto",stockProvider:"Auto",stockLicense:"Auto",imageCount:"",
+    imageAltStrategy:"Auto",imageAttribution:false,otherImageUrls:"",uploadedFiles:[],
+    youtubeMode:"None",youtubeUrls:"",youtubePosition:"Auto",
+    co_minSeoScore:"",co_readability:"Auto",co_requireFAQ:false,
+    co_requireTOC:false,co_requireConclusion:false,co_requiredH2Count:"",
+    co_requiredFAQCount:"",co_requiredInternalLinks:"",co_prohibitedPhrases:"",
+    co_requireCitations:false,co_freshDataSince:"Auto",co_notesToEditor:"",co_ctaPlacement:"Auto"
+  };
+
+  // ---------- State ----------
+  let mode = "autopilot"; let dest = "WordPress";
+  let adv = JSON.parse(JSON.stringify(defaultAdv));
+  let jobs = []; let reviewId = null;
+
+  // ---------- Elements ----------
+  const kwEl = document.getElementById("kw");
+  const kwCountEl = document.getElementById("kwCount");
+  const genBtn = document.getElementById("genBtn");
+  const modeAuto = document.getElementById("modeAuto");
+  const modeCo = document.getElementById("modeCo");
+  const modeNote = document.getElementById("modeNote");
+  const advToggle = document.getElementById("advToggle");
+  const advPanel = document.getElementById("advPanel");
+  const jobsWrap = document.getElementById("jobs");
+  const previewWrap = document.getElementById("previewWrap");
+  const toWp = document.getElementById("toWp");
+  const toBl = document.getElementById("toBl");
+  const clearBtn = document.getElementById("clearBtn");
+  const yearEl = document.getElementById("year");
+  const fileInput = document.getElementById("fileInput");
+  const fileList = document.getElementById("fileList");
+  const rfWrap = document.getElementById("rfWrap");
+  const urlWrap = document.getElementById("urlWrap");
+  const upWrap = document.getElementById("upWrap");
+  const ytUrls = document.getElementById("ytUrls");
+  // Drawer
+  const aside = document.getElementById("aside");
+  const shade = document.getElementById("shade");
+  const closeDrawer = document.getElementById("closeDrawer");
+  const drawerTitle = document.getElementById("drawerTitle");
+  const drawerBody = document.getElementById("drawerBody");
+
+  yearEl.textContent = new Date().getFullYear();
+
+  function updateModeUI(){
+    modeNote.innerHTML = mode==="autopilot"
+      ? '<span class="tag green">Hands‑free</span><span>Research → Draft → Optimize → Publish automatically to your CMS</span>'
+      : '<span class="tag blue">You review</span><span>Set guardrails & an approval checklist; we wait for your OK</span>';
+    genBtn.textContent = mode==="autopilot" ? "▶️ Generate & Publish" : "🪄 Generate Drafts";
+  }
+  function renderKwCount(){
+    const list = parseKeywords(kwEl.value);
+    kwCountEl.textContent = `${list.length} keyword${list.length!==1?"s":""} detected`;
+    renderPreview(); // update preview for first keyword
+  }
+  function renderPreview(){
+    const list = parseKeywords(kwEl.value);
+    if(list.length===0){ previewWrap.innerHTML = '<div class="small muted">Add a keyword to see a sample preview.</div>'; return; }
+    const ov = gatherOverrides();
+    const p = fakePreview(list[0], ov);
+    previewWrap.innerHTML = `
+      <div class="small" style="display:grid;gap:8px">
+        <div>
+          <div class="small muted">Proposed title</div>
+          <div style="font-weight:600">${escapeHtml(p.title)}</div>
+        </div>
+        <div class="grid2">
+          <div><div class="small muted">Slug</div><div>/${escapeHtml(p.slug)}</div></div>
+          <div><div class="small muted">SEO score</div><div><b>${p.seoScore}</b>/100</div></div>
+          <div><div class="small muted">Word count</div><div>≈ ${Number(p.wordCount).toLocaleString()}</div></div>
+          <div><div class="small muted">Reading time</div><div>≈ ${p.readingMins} min</div></div>
+        </div>
+        <div><div class="small muted">Meta description</div><div>${escapeHtml(p.description)}</div></div>
+        <div>
+          <div class="small muted">Outline</div>
+          <ol style="padding-left:18px">${p.outline.map(o=>`<li>${escapeHtml(o)}</li>`).join("")}</ol>
+        </div>
+        <div>
+          <div class="small muted">Key entities</div>
+          <div class="row">${p.entities.map(e=>`<span class="tag">${escapeHtml(e)}</span>`).join("")}</div>
+        </div>
+      </div>`;
+  }
+  function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m]))}
+
+  function gatherOverrides(){
+    const candidate = Object.assign({}, adv);
+    // numeric normalization
+    ["wordMin","wordMax","externalLinksMax","imageCount","co_requiredH2Count","co_requiredFAQCount","co_requiredInternalLinks"].forEach(k=>{
+      if(candidate[k]==="") return;
+      const n = Number(candidate[k]); candidate[k] = isNaN(n)?"":n;
+    });
+    return cleanOverrides(candidate, defaultAdv);
+  }
+
+  function startPipeline(){
+    const list = parseKeywords(kwEl.value);
+    if(list.length===0){ alert("Please add at least one long‑tail keyword."); return; }
+    const ov = gatherOverrides();
+    const newJobs = list.map((kw,i)=>({ id: Date.now()+"-"+Math.random().toString(36).slice(2,7), kw, stepIdx:0, status:"Queued", overrides:ov, preview: fakePreview(kw, ov) }));
+    jobs = [...newJobs, ...jobs];
+    renderJobs();
+    // simulate
+    newJobs.forEach((job,j)=>{
+      const begin = 400 + j*150;
+      setTimeout(()=>advance(job.id,0), begin);
+      function advance(id, idx){
+        const pos = jobs.findIndex(x=>x.id===id); if(pos<0) return;
+        jobs[pos].stepIdx = idx; jobs[pos].status = "Working"; renderJobs();
+        if(idx < PIPELINE_STEPS.length-1){
+          setTimeout(()=>advance(id,idx+1), 650);
+        } else {
+          setTimeout(()=>{ const p = jobs.findIndex(x=>x.id===id); if(p<0) return; jobs[p].status = (mode==="autopilot")?"Published":"Awaiting review"; renderJobs(); }, 500);
+        }
+      }
+    });
+  }
+
+  function renderJobs(){
+    if(jobs.length===0){ jobsWrap.innerHTML = '<div class="small muted">No jobs yet. Generate articles to see progress.</div>'; return; }
+    jobsWrap.innerHTML = jobs.map(job=>{
+      return `
+      <div class="job">
+        <div class="row" style="justify-content:space-between;align-items:flex-start">
+          <div>
+            <div class="row" style="gap:8px;flex-wrap:wrap">
+              <div style="font-weight:600">${escapeHtml(job.kw)}</div>
+              ${job.status==="Published" ? '<span class="tag green">Published</span>' : job.status==="Awaiting review" ? '<span class="tag amber">Awaiting review</span>' : job.status==="Working" ? '<span class="tag violet">Processing</span>' : '<span class="tag">Queued</span>'}
+              <span class="small muted">→ ${dest}</span>
+            </div>
+            <div class="steps" style="margin-top:10px">
+              ${PIPELINE_STEPS.map((s,i)=>`<div class="step"><div class="dot ${i<job.stepIdx?'done': i===job.stepIdx?'active':''}">${i<job.stepIdx?'✓':i+1}</div><div class="small ${i<=job.stepIdx?'':'muted'}">${s}</div></div>`).join("")}
+            </div>
+            ${job.overrides && Object.keys(job.overrides).length>0 ? `<div class="small muted" style="margin-top:8px"><div style="font-weight:600;color:#374151;margin-bottom:4px">Overrides applied:</div><div class="row">${Object.entries(job.overrides).map(([k,v])=>`<span class="tag">${escapeHtml(k)}: ${escapeHtml(String(v))}</span>`).join("")}</div></div>` : ""}
+          </div>
+          <div class="row">
+            ${mode==="copilot" ? `<button class="gbtn" onclick="openReview('${job.id}')">👁️ Review</button>` : ""}
+            <button class="gbtn" onclick="removeJob('${job.id}')">🗑️ Remove</button>
+          </div>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  function openReview(id){
+    reviewId=id;
+    const job = jobs.find(x=>x.id===id); if(!job) return;
+    drawerTitle.textContent = job.kw;
+    drawerBody.innerHTML = buildPreviewHTML(job.preview) + (job.overrides && Object.keys(job.overrides).length>0 ? `<div class="small" style="margin-top:10px"><div style="font-weight:600">Overrides</div><div class="row" style="margin-top:6px">${Object.entries(job.overrides).map(([k,v])=>`<span class="tag">${escapeHtml(k)}: ${escapeHtml(String(v))}</span>`).join("")}</div></div>` : "") + `
+      <div class="row" style="justify-content:flex-end;margin-top:12px">
+        <button class="gbtn" onclick="regenerate('${job.id}')" title="Refresh draft with current overrides">🪄 Regenerate</button>
+        <button class="btn" onclick="approvePublish('${job.id}')">⬆️ Approve & Publish</button>
+      </div>`;
+    aside.classList.add("open");
+  }
+  function closeReview(){ aside.classList.remove("open"); reviewId=null; }
+  function buildPreviewHTML(p){
+    return `<div class="small" style="display:grid;gap:8px">
+      <div><div class="small muted">Proposed title</div><div style="font-weight:600">${escapeHtml(p.title)}</div></div>
+      <div class="grid2">
+        <div><div class="small muted">Slug</div><div>/${escapeHtml(p.slug)}</div></div>
+        <div><div class="small muted">SEO score</div><div><b>${p.seoScore}</b>/100</div></div>
+        <div><div class="small muted">Word count</div><div>≈ ${Number(p.wordCount).toLocaleString()}</div></div>
+        <div><div class="small muted">Reading time</div><div>≈ ${p.readingMins} min</div></div>
+      </div>
+      <div><div class="small muted">Meta description</div><div>${escapeHtml(p.description)}</div></div>
+      <div><div class="small muted">Outline</div><ol style="padding-left:18px">${p.outline.map(o=>`<li>${escapeHtml(o)}</li>`).join("")}</ol></div>
+      <div><div class="small muted">Key entities</div><div class="row">${p.entities.map(e=>`<span class="tag">${escapeHtml(e)}</span>`).join("")}</div></div>
+    </div>`;
+  }
+  function approvePublish(id){
+    const i = jobs.findIndex(x=>x.id===id); if(i<0) return;
+    jobs[i].status="Published"; renderJobs(); closeReview();
+  }
+  function regenerate(id){
+    const i = jobs.findIndex(x=>x.id===id); if(i<0) return;
+    jobs[i].preview = fakePreview(jobs[i].kw, jobs[i].overrides); jobs[i].stepIdx=2; renderJobs();
+  }
+  function removeJob(id){
+    jobs = jobs.filter(x=>x.id!==id); renderJobs(); if(reviewId===id) closeReview();
+  }
+
+  // ---------- Events ----------
+  kwEl.addEventListener("input", renderKwCount);
+  genBtn.addEventListener("click", startPipeline);
+  modeAuto.addEventListener("click", ()=>{mode="autopilot"; updateModeUI(); renderJobs();});
+  modeCo.addEventListener("click", ()=>{mode="copilot"; updateModeUI(); renderJobs();});
+  advToggle.addEventListener("click", ()=>{advPanel.style.display = advPanel.style.display==="none"?"block":"none"});
+  toWp.addEventListener("click", ()=>{dest="WordPress"; renderJobs();});
+  toBl.addEventListener("click", ()=>{dest="Blogger"; renderJobs();});
+  clearBtn.addEventListener("click", ()=>{kwEl.value=""; adv=JSON.parse(JSON.stringify(defaultAdv)); renderKwCount(); document.querySelectorAll(".adv").forEach(resetAdvInput); hideMediaSections();});
+  function resetAdvInput(el){ if(el.type==="checkbox") el.checked = !!(defaultAdv[el.dataset.key]); else el.value = defaultAdv[el.dataset.key] ?? ""; }
+
+  // Advanced inputs delegation
+  document.addEventListener("input", (e)=>{
+    const el = e.target;
+    if(el.classList.contains("adv")){
+      const key = el.dataset.key;
+      let val = el.type==="checkbox" ? el.checked : el.value;
+      adv[key] = val;
+      if(key==="mediaSource") updateMediaUI();
+      if(key==="youtubeMode") ytUrls.style.display = (val==="Specific URLs")?"block":"none";
+      if(key==="wordMax" || key==="metaTitleOverride" || key==="metaDescOverride" || key==="slugOverride"){ renderPreview(); }
+    }
+  });
+  function updateMediaUI(){
+    rfWrap.style.display = adv.mediaSource==="Royalty-free" ? "block":"none";
+    urlWrap.style.display = adv.mediaSource==="Other URLs" ? "block":"none";
+    upWrap.style.display = adv.mediaSource==="Upload" ? "block":"none";
+  }
+  function hideMediaSections(){ rfWrap.style.display="none"; urlWrap.style.display="none"; upWrap.style.display="none"; ytUrls.style.display="none"; }
+  if(fileInput){
+    fileInput.addEventListener("change", ()=>{
+      const files = Array.from(fileInput.files||[]).map(f=>f.name);
+      adv.uploadedFiles = files;
+      fileList.textContent = files.length? ("Selected: "+files.join(", ")) : "";
+    });
+  }
+  shade.addEventListener("click", closeReview); closeDrawer.addEventListener("click", closeReview);
+
+  // ---------- Tests ----------
+  function runTests(){
+    const cases=[];
+    cases.push({name:"slugify removes symbols & spaces", pass: slugify("Hello World!") === "hello-world"});
+    cases.push({name:"slugify trims and limits length", pass: slugify("  A   B   C  ").startsWith("a-b-c")});
+    cases.push({name:"capitalize works", pass: cap("bangladesh")==="Bangladesh"});
+    const parsed = parseKeywords("one, two\n two \nthree");
+    cases.push({name:"parseKeywords splits by comma & newline", pass: parsed.length===3});
+    cases.push({name:"parseKeywords dedupes & trims", pass: parsed[1]==="two"});
+    const cleanedDefault = cleanOverrides(defaultAdv, defaultAdv);
+    cases.push({name:"cleanOverrides on default is empty", pass: Object.keys(cleanedDefault).length===0});
+    const sample = cleanOverrides({...defaultAdv, tone:"Friendly", wordMax:1200, externalLinksMax:3, slugOverride:"custom", mediaSource:"AI", youtubeMode:"Specific URLs", youtubeUrls:"https://youtube.com/watch?v=dQw4w9WgXcQ"}, defaultAdv);
+    cases.push({name:"cleanOverrides keeps set values", pass: sample.tone==="Friendly" && sample.wordMax===1200 && sample.externalLinksMax===3 && sample.slugOverride==="custom"});
+    cases.push({name:"media + youtube overrides kept", pass: sample.mediaSource==="AI" && sample.youtubeMode==="Specific URLs" && /youtube/.test(sample.youtubeUrls||"")});
+    const prev = fakePreview("test", sample);
+    cases.push({name:"preview uses slug override", pass: prev.slug==="custom"});
+    return cases.map(c=>({...c, details: c.pass? "" : JSON.stringify(c)}));
+  }
+  function renderTests(){
+    const tests = runTests();
+    const all = tests.every(t=>t.pass);
+    const el = document.getElementById("tests");
+    el.innerHTML = `<div class="row"><span class="tag ${all?'green':'red'}">${all?'All tests passed':'Some tests failed'}</span><span class="small muted">(visible only in prototype)</span></div>
+      <ul style="margin:10px 0;padding-left:18px">${tests.map(t=>`<li>${t.pass?'✅':'❌'} <b>${escapeHtml(t.name)}</b>${t.pass?'':` <span class="warn small"> ${escapeHtml(t.details)}</span>`}</li>`).join("")}</ul>`;
+  }
+
+  // Boot
+  updateModeUI(); renderKwCount(); renderJobs(); renderTests(); hideMediaSections();
+</script>
+</body>
+</html>

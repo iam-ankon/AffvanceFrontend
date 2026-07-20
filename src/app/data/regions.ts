@@ -1,0 +1,71 @@
+export interface Region {
+  code: string;
+  name: string;
+}
+
+export const regions: Region[] = [
+  { code: 'us', name: 'United States' },
+  { code: 'gb', name: 'United Kingdom' },
+  { code: 'ca', name: 'Canada' },
+  { code: 'au', name: 'Australia' },
+  { code: 'nz', name: 'New Zealand' },
+  { code: 'in', name: 'India' },
+  { code: 'sg', name: 'Singapore' },
+  { code: 'my', name: 'Malaysia' },
+  { code: 'ph', name: 'Philippines' },
+  { code: 'id', name: 'Indonesia' },
+  { code: 'th', name: 'Thailand' },
+  { code: 'vn', name: 'Vietnam' },
+  { code: 'jp', name: 'Japan' },
+  { code: 'kr', name: 'South Korea' },
+  { code: 'cn', name: 'China' },
+  { code: 'hk', name: 'Hong Kong' },
+  { code: 'tw', name: 'Taiwan' },
+  { code: 'de', name: 'Germany' },
+  { code: 'fr', name: 'France' },
+  { code: 'it', name: 'Italy' },
+  { code: 'es', name: 'Spain' },
+  { code: 'pt', name: 'Portugal' },
+  { code: 'nl', name: 'Netherlands' },
+  { code: 'be', name: 'Belgium' },
+  { code: 'ch', name: 'Switzerland' },
+  { code: 'at', name: 'Austria' },
+  { code: 'se', name: 'Sweden' },
+  { code: 'no', name: 'Norway' },
+  { code: 'dk', name: 'Denmark' },
+  { code: 'fi', name: 'Finland' },
+  { code: 'ie', name: 'Ireland' },
+  { code: 'za', name: 'South Africa' },
+  { code: 'ae', name: 'United Arab Emirates' },
+  { code: 'sa', name: 'Saudi Arabia' },
+  { code: 'eg', name: 'Egypt' },
+  { code: 'ng', name: 'Nigeria' },
+  { code: 'ke', name: 'Kenya' },
+  { code: 'gh', name: 'Ghana' },
+  { code: 'ma', name: 'Morocco' },
+  { code: 'tn', name: 'Tunisia' },
+  { code: 'dz', name: 'Algeria' },
+  { code: 'br', name: 'Brazil' },
+  { code: 'mx', name: 'Mexico' },
+  { code: 'ar', name: 'Argentina' },
+  { code: 'co', name: 'Colombia' },
+  { code: 'pe', name: 'Peru' },
+  { code: 'cl', name: 'Chile' },
+  { code: 've', name: 'Venezuela' },
+  { code: 'ru', name: 'Russia' },
+  { code: 'ua', name: 'Ukraine' },
+  { code: 'pl', name: 'Poland' },
+  { code: 'tr', name: 'Turkey' },
+  { code: 'il', name: 'Israel' },
+  { code: 'qa', name: 'Qatar' },
+  { code: 'kw', name: 'Kuwait' },
+  { code: 'bh', name: 'Bahrain' },
+  { code: 'om', name: 'Oman' },
+  { code: 'jo', name: 'Jordan' },
+  { code: 'lb', name: 'Lebanon' }
+];
+
+// Remove duplicates by creating a Map and converting back to array
+export const uniqueRegions = Array.from(
+  new Map(regions.map((region) => [region.code, region])).values()
+);

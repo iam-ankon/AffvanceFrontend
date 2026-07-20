@@ -1,0 +1,12 @@
+cache
+.cache
+public
+CHANGELOG.md
+yarn.lock
+package-lock.json
+dist
+node_modules
+.next
+build
+.contentlayer
+migrations
