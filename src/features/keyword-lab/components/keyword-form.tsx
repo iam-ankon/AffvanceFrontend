@@ -583,37 +583,65 @@ export function KeywordForm({ onSearchComplete, onAddKeywords }: KeywordFormProp
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-full p-0" align="start">
+              <PopoverContent className="w-[280px] p-0" align="start">
                 <Command>
                   <CommandInput placeholder="Search locations..." />
                   {isLocationsLoading ? (
-                    <div className="py-6 text-center text-sm">Loading locations...</div>
+                    <div className="flex flex-col items-center gap-1.5 py-6 text-center text-sm text-muted-foreground">
+                      <span className="animate-spin text-lg">⏳</span>
+                      <span>Loading locations…</span>
+                      <span className="text-xs text-muted-foreground/70">
+                        Fetching from DataForSEO for the first time
+                      </span>
+                    </div>
                   ) : locations.length === 0 ? (
                     <CommandEmpty>No locations found.</CommandEmpty>
-                  ) : (
-                    <CommandGroup className="max-h-[200px] overflow-y-auto">
-                      {locations.map((location: Location) => (
-                        <CommandItem
-                          key={location.location_code}
-                          value={location.location_name}
-                          onSelect={() => {
-                            setSelectedLocation(location);
-                            setIsLocationOpen(false);
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              'mr-2 h-4 w-4',
-                              selectedLocation?.location_code === location.location_code
-                                ? 'opacity-100'
-                                : 'opacity-0'
-                            )}
-                          />
-                          {location.location_name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  )}
+                  ) : (() => {
+                    // Group locations by type
+                    const typeOrder = ['Country', 'State', 'Province', 'Region', 'City Region', 'Municipality', 'City', 'Neighborhood', 'Postal Code', 'University', 'Airport'];
+                    const grouped = locations.reduce<Record<string, Location[]>>((acc, loc) => {
+                      const key = loc.location_type || 'Other';
+                      if (!acc[key]) acc[key] = [];
+                      acc[key].push(loc);
+                      return acc;
+                    }, {});
+                    const sortedTypes = Object.keys(grouped).sort((a, b) => {
+                      const ai = typeOrder.indexOf(a);
+                      const bi = typeOrder.indexOf(b);
+                      if (ai === -1 && bi === -1) return a.localeCompare(b);
+                      if (ai === -1) return 1;
+                      if (bi === -1) return -1;
+                      return ai - bi;
+                    });
+                    return (
+                      <div className="max-h-[260px] overflow-y-auto">
+                        {sortedTypes.map((type) => (
+                          <CommandGroup key={type} heading={type}>
+                            {grouped[type].map((location: Location) => (
+                              <CommandItem
+                                key={location.location_code}
+                                value={`${location.location_name} ${type}`}
+                                onSelect={() => {
+                                  setSelectedLocation(location);
+                                  setIsLocationOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    'mr-2 h-4 w-4 shrink-0',
+                                    selectedLocation?.location_code === location.location_code
+                                      ? 'opacity-100'
+                                      : 'opacity-0'
+                                  )}
+                                />
+                                <span className="truncate">{location.location_name}</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </Command>
               </PopoverContent>
             </Popover>

@@ -201,7 +201,7 @@ export function useCountrySearch(search?: string): UseQueryResult<Country[], Err
 // Search locations within a country
 export function useLocationSearch(
   countryCode?: number,
-  locationType: string = 'City'
+  locationType?: string
 ): UseQueryResult<{ locations: Location[] }, Error> {
   return useQuery<{ locations: Location[] }, Error, { locations: Location[] }, LocationQueryKey>({
     queryKey: ['locations', countryCode, locationType],
@@ -209,10 +209,12 @@ export function useLocationSearch(
       if (!countryCode) {
         return { locations: [] };
       }
+      const params: Record<string, string | number> = { limit: 200 };
+      if (locationType) params.location_type = locationType;
       const response = await api.get<LocationApiResponse>(
         `/keywords/countries/${countryCode}/locations/`,
         {
-          params: { location_type: locationType },
+          params,
           _skipErrorHandler: true
         }
       );
@@ -230,9 +232,13 @@ export function useLocationSearch(
       return { locations: formattedLocations };
     },
     enabled: !!countryCode,
-    staleTime: 5 * 60 * 1000,
-    retry: 1,
-    refetchOnWindowFocus: false
+    // Locations are stable — cache for 24 h so repeat country selections are instant.
+    staleTime: 24 * 60 * 60 * 1000,
+    // The first request for an unsynced country triggers a DataForSEO fetch on
+    // the backend (a few seconds).  Give it a longer timeout and retry once.
+    retry: 2,
+    retryDelay: 1500,
+    refetchOnWindowFocus: false,
   });
 }
 

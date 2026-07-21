@@ -9,7 +9,9 @@ import {
   FileText,
   Loader2,
   Search,
-  TrendingUp
+  TrendingUp,
+  BarChart2,
+  BookOpen,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import * as React from 'react';
@@ -17,6 +19,8 @@ import Link from 'next/link';
 import {
   Area,
   AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
   Cell,
   Pie,
@@ -74,6 +78,73 @@ interface DashboardOverview {
 
 interface ApiEnvelope<T> {
   data?: T;
+}
+
+// Keyword lab data shapes
+interface TopKeyword {
+  keyword: string;
+  search_volume: number;
+  competition_level: string;
+  keyword_difficulty?: number;
+  collection_title?: string;
+}
+
+interface KeywordLibrarySearchApiResponse {
+  data?: {
+    results?: TopKeyword[];
+  };
+}
+
+// Traffic source breakdown derived from content generation types
+interface TrafficSource {
+  name: string;
+  value: number;
+  color: string;
+}
+
+interface ContentTypeBreakdown {
+  label: string;
+  count: number;
+}
+
+function useTopKeywords() {
+  return useQuery<TopKeyword[]>({
+    queryKey: ['top-driving-keywords'],
+    queryFn: async () => {
+      const response = await api.get<KeywordLibrarySearchApiResponse>('/keywords/search/', {
+        params: { page: 1, page_size: 8 },
+        _skipErrorHandler: true,
+      });
+      const results = response?.data?.results ?? (response as unknown as { results?: TopKeyword[] })?.results ?? [];
+      // Sort by search volume descending
+      return [...results].sort((a, b) => (b.search_volume ?? 0) - (a.search_volume ?? 0));
+    },
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+function useContentTypeBreakdown() {
+  return useQuery<ContentTypeBreakdown[]>({
+    queryKey: ['content-type-breakdown'],
+    queryFn: async () => {
+      // Reuse the existing quality overview endpoint which has total_articles and scored_articles
+      const response = await api.get<ApiEnvelope<ContentQualityOverview>>('/content/dashboard/content-quality/');
+      const d = response?.data;
+      if (!d) return [];
+      // Derive a breakdown from what we have: scored vs unscored, healthy vs needing work
+      const healthy = d.content_health?.filter(r => r.health_label === 'Healthy').length ?? 0;
+      const needsOptimization = d.content_health?.filter(r => r.health_label === 'Needs Optimization').length ?? 0;
+      const critical = d.content_health?.filter(r => r.health_label === 'Critical').length ?? 0;
+      const unscored = d.total_articles - d.scored_articles;
+      return [
+        { label: 'Healthy', count: healthy },
+        { label: 'Needs Work', count: needsOptimization },
+        { label: 'Critical', count: critical },
+        { label: 'Unscored', count: unscored > 0 ? unscored : 0 },
+      ].filter(r => r.count > 0);
+    },
+    staleTime: 60 * 1000,
+  });
 }
 
 function useContentQualityOverview() {
@@ -137,10 +208,21 @@ export function DashboardAnalyticsView() {
   const gid = React.useId().replace(/:/g, '');
   const quality = useContentQualityOverview();
   const overview = useDashboardOverview();
+  const topKeywordsQuery = useTopKeywords();
+  const contentBreakdownQuery = useContentTypeBreakdown();
 
   const isLoading = quality.isLoading || overview.isLoading;
   const q = quality.data;
   const ov = overview.data;
+  const topKeywords = topKeywordsQuery.data ?? [];
+  const contentBreakdown = contentBreakdownQuery.data ?? [];
+
+  const BREAKDOWN_COLORS: Record<string, string> = {
+    Healthy: '#10b981',
+    'Needs Work': '#f59e0b',
+    Critical: '#f43f5e',
+    Unscored: '#94a3b8',
+  };
 
   const handleExportCSV = () => {
     if (!q || q.content_health.length === 0) return;
@@ -492,40 +574,145 @@ ${articleLines || '(No scored articles yet.)'}
             )}
           </motion.div>
 
+          {/* Top Keywords from Keyword Lab */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
             className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm"
           >
-            <h3 className="mb-6 font-bold text-slate-900">Top Driving Keywords</h3>
-            <div className="flex flex-col items-center gap-2 py-6 text-center">
-              <Search size={24} className="text-slate-300" />
-              <p className="text-xs text-slate-400">
-                Keyword-level traffic requires Google Search Console, which isn&apos;t connected yet.
-              </p>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="font-bold text-slate-900">Top Saved Keywords</h3>
+              <Link
+                href="/app/keyword-lab"
+                className="text-[10px] font-bold text-violet-600 hover:text-violet-700"
+              >
+                Keyword Lab →
+              </Link>
             </div>
-            <Link
-              href="/app/keyword-lab"
-              className="mt-2 block w-full py-2 text-center text-xs font-bold text-violet-600 transition-colors hover:text-violet-700"
-            >
-              Keyword Lab →
-            </Link>
+            {topKeywordsQuery.isLoading ? (
+              <div className="flex h-32 items-center justify-center">
+                <Loader2 className="h-4 w-4 animate-spin text-slate-300" />
+              </div>
+            ) : topKeywords.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-6 text-center">
+                <Search size={24} className="text-slate-300" />
+                <p className="text-xs text-slate-400">
+                  No saved keywords yet. Search and save keywords in the Keyword Lab to see them here.
+                </p>
+                <Link
+                  href="/app/keyword-lab"
+                  className="mt-1 text-xs font-bold text-violet-600 hover:text-violet-700"
+                >
+                  Go to Keyword Lab →
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {topKeywords.map((kw, i) => {
+                  const maxVol = topKeywords[0]?.search_volume || 1;
+                  const pct = Math.round(((kw.search_volume ?? 0) / maxVol) * 100);
+                  const diffColor =
+                    (kw.keyword_difficulty ?? 0) > 70
+                      ? 'text-rose-500'
+                      : (kw.keyword_difficulty ?? 0) > 40
+                      ? 'text-amber-500'
+                      : 'text-emerald-500';
+                  return (
+                    <div key={`${kw.keyword}-${i}`} className="group">
+                      <div className="mb-0.5 flex items-center justify-between">
+                        <span className="max-w-[140px] truncate text-xs font-medium text-slate-700">
+                          {kw.keyword}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-500">
+                          {(kw.search_volume ?? 0).toLocaleString()}
+                          {kw.keyword_difficulty != null && (
+                            <span className={cn('ml-1.5', diffColor)}>
+                              KD {kw.keyword_difficulty}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <div className="h-1 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className="h-full rounded-full bg-violet-400 transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </motion.div>
 
+          {/* Content Health Breakdown (replaces GA Traffic Sources) */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.3 }}
             className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm"
           >
-            <h3 className="mb-6 font-bold text-slate-900">Traffic Sources</h3>
-            <div className="flex flex-col items-center gap-2 py-6 text-center">
-              <TrendingUp size={24} className="text-slate-300" />
-              <p className="text-xs text-slate-400">
-                Traffic-source breakdown requires Google Analytics with channel grouping enabled.
-              </p>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="font-bold text-slate-900">Content Status Breakdown</h3>
+              <BarChart2 size={14} className="text-slate-300" />
             </div>
+            {contentBreakdownQuery.isLoading ? (
+              <div className="flex h-32 items-center justify-center">
+                <Loader2 className="h-4 w-4 animate-spin text-slate-300" />
+              </div>
+            ) : contentBreakdown.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-6 text-center">
+                <BookOpen size={24} className="text-slate-300" />
+                <p className="text-xs text-slate-400">
+                  No content scored yet. Generate and publish articles to see a health breakdown here.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="h-[160px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={contentBreakdown} layout="vertical" margin={{ left: 0, right: 8 }}>
+                      <XAxis type="number" hide />
+                      <YAxis
+                        type="category"
+                        dataKey="label"
+                        width={72}
+                        tick={{ fontSize: 10, fill: '#64748b' }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip
+                        formatter={(val: number) => [`${val} articles`, '']}
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                      />
+                      <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                        {contentBreakdown.map((entry) => (
+                          <Cell
+                            key={entry.label}
+                            fill={BREAKDOWN_COLORS[entry.label] ?? '#8b5cf6'}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {contentBreakdown.map((entry) => (
+                    <div key={entry.label} className="flex items-center gap-1.5">
+                      <div
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ background: BREAKDOWN_COLORS[entry.label] ?? '#8b5cf6' }}
+                      />
+                      <span className="text-[10px] text-slate-500">
+                        {entry.label}:{' '}
+                        <span className="font-bold text-slate-700">{entry.count}</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </motion.div>
         </div>
       </div>
