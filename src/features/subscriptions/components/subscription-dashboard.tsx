@@ -134,7 +134,7 @@ function ChangePlanDialog({ subscriptionId }: { subscriptionId: string }) {
                     <Badge className="absolute -top-2 right-3 text-xs">Current</Badge>
                   )}
                   <div className="mb-3">
-                    <div className="font-semibold">{plan.name}</div>
+                    <div className="font-semibold">{plan.name.replace(/^Affvance\s+/i, '')}</div>
                     <div className="text-2xl font-bold">
                       ${plan.price}
                       <span className="text-muted-foreground text-sm font-normal">

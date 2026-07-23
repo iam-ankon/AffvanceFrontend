@@ -163,30 +163,47 @@ type CountryApiResponse = {
 type LocationApiResponse = {
   data?: {
     locations?: Location[];
+    sync_error?: string;
   };
   locations?: Location[];
+  sync_error?: string;
   [key: string]: unknown;
 };
 
+/** Country[] with an optional `_apiMessage` — carries a backend diagnostic
+ * message (e.g. why an on-demand DataForSEO country fetch failed) so the UI
+ * can show it directly, without needing server/log access to see why a
+ * country search returned nothing. */
+export type CountrySearchResult = Country[] & { _apiMessage?: string };
+
 /** `search` is sent to `/keywords/countries/?search=` — prefer ISO-3166 alpha-2 (e.g. `US`) over display names. */
-export function useCountrySearch(search?: string): UseQueryResult<Country[], Error> {
-  return useQuery<Country[], Error, Country[], CountryQueryKey>({
+export function useCountrySearch(search?: string): UseQueryResult<CountrySearchResult, Error> {
+  return useQuery<CountrySearchResult, Error, CountrySearchResult, CountryQueryKey>({
     queryKey: ['countries', search],
     queryFn: async () => {
       if (!search) {
-        return [];
+        return [] as CountrySearchResult;
       }
       const response = await api.get<CountryApiResponse | Country[]>(`/keywords/countries/`, {
         params: { search },
         _skipErrorHandler: true
       });
       const data = Array.isArray(response) ? response : (Array.isArray(response?.data) ? response.data : []);
-      
+      const apiMessage = Array.isArray(response) ? undefined : (response?.message as string | undefined);
+
       // Format country names to have a space after each comma
-      return data.map(country => ({
+      const formatted = data.map(country => ({
         ...country,
         location_name: country.location_name.replace(/,/g, ', ')
-      }));
+      })) as CountrySearchResult;
+
+      // Only surface the message when we got zero results — a message on a
+      // successful non-empty response is just "Retrieved N countries..." noise.
+      if (formatted.length === 0 && apiMessage) {
+        formatted._apiMessage = apiMessage;
+      }
+
+      return formatted;
     },
     enabled: !!search,
     staleTime: 5 * 60 * 1000,
@@ -202,8 +219,8 @@ export function useCountrySearch(search?: string): UseQueryResult<Country[], Err
 export function useLocationSearch(
   countryCode?: number,
   locationType?: string
-): UseQueryResult<{ locations: Location[] }, Error> {
-  return useQuery<{ locations: Location[] }, Error, { locations: Location[] }, LocationQueryKey>({
+): UseQueryResult<{ locations: Location[]; syncError?: string }, Error> {
+  return useQuery<{ locations: Location[]; syncError?: string }, Error, { locations: Location[]; syncError?: string }, LocationQueryKey>({
     queryKey: ['locations', countryCode, locationType],
     queryFn: async () => {
       if (!countryCode) {
@@ -229,7 +246,11 @@ export function useLocationSearch(
         location_name: loc.location_name.replace(/,/g, ', ')
       }));
 
-      return { locations: formattedLocations };
+      // Non-null when the backend's on-demand DataForSEO fetch failed — surface
+      // it so the person can see exactly why, right in the UI.
+      const syncError = response.data?.sync_error ?? response.sync_error ?? undefined;
+
+      return { locations: formattedLocations, syncError };
     },
     enabled: !!countryCode,
     // Locations are stable — cache for 24 h so repeat country selections are instant.

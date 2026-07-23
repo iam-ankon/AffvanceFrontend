@@ -1,13 +1,5 @@
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+'use client';
+
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   useActiveSubscription,
@@ -18,7 +10,14 @@ import { usePaddle } from '@/lib/providers/paddle-provider';
 import type { SubscriptionPlan } from '@/types/subscription';
 import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, Sparkles, Zap } from 'lucide-react';
+import {
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Flame,
+  ShieldCheck,
+  Zap,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -29,9 +28,7 @@ const container = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-    },
+    transition: { staggerChildren: 0.08 },
   },
 };
 
@@ -40,50 +37,27 @@ const item = {
   show: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 };
 
-// Plan content overrides based on user request
-const planContentOverrides: Record<string, any> = {
-  pro: {
-    originalPrice: 39,
-    price: 29,
-    tokens: '250,000 Tokens',
-    keywords: '500 Keywords',
-    features: [
-      'SEO Quality Score',
-      'CMS Sync',
-      'Originality Shield',
-      'Weekly Growth Report',
-    ],
-    buttonText: 'Try Pro',
-  },
-  growth: {
-    originalPrice: 99,
-    price: 79,
-    tokens: '1 Million Tokens',
-    keywords: '1500 Keywords',
-    features: [
-      'Bulk Content Mode',
-      'Auto-Link Clusters',
-      'Priority Search Node',
-      'Keyword Lab Pro',
-      'Snippet Pro',
-    ],
-    buttonText: 'Start Growth',
-  },
-  agency: {
-    originalPrice: 249,
-    price: 199,
-    tokens: '3 Million Tokens',
-    keywords: '5000 Keywords',
-    features: [
-      'Team Workspaces',
-      'API Automation',
-      'Expert Consult',
-      'White-Label Hub',
-      'Managed Loops',
-    ],
-    buttonText: 'Join Agency',
-  },
-};
+// Strip the "Affvance " prefix for display — the brand is already implied
+// by the app the user is sitting in (matches how the marketing page shows
+// just "Pro" / "Growth" / "Agency" without repeating the product name).
+function shortName(name: string) {
+  return name.replace(/^Affvance\s+/i, '');
+}
+
+// Build a readable feature list for a plan. Prefers the curated
+// `features.highlights` array (set by the seed data / admin), falling back
+// to turning boolean feature flags into readable labels if it's missing.
+function getHighlights(plan: SubscriptionPlan): string[] {
+  const features = plan.features as Record<string, unknown> | null;
+  const highlights = features?.highlights;
+  if (Array.isArray(highlights) && highlights.length > 0) {
+    return highlights as string[];
+  }
+  if (!features) return [];
+  return Object.entries(features)
+    .filter(([k, v]) => v === true && k !== 'highlights')
+    .map(([k]) => k.replace(/_/g, ' '));
+}
 
 export function PlanCards() {
   const [cycle, setCycle] = useState<BillingCycle>('monthly');
@@ -95,11 +69,25 @@ export function PlanCards() {
 
   const [isSuccess, setIsSuccess] = useState(false);
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const filteredPlans =
-    plans?.filter((p: SubscriptionPlan) => p.billing_cycle === cycle) ?? [];
+  // Recurring plans (Pro / Growth / Agency) for the selected billing cycle.
+  const recurringPlans =
+    plans?.filter(
+      (p: SubscriptionPlan) => p.billing_cycle === cycle && !p.is_one_time_purchase
+    ) ?? [];
+
+  // The one-time Entry Pass — shown regardless of the monthly/yearly toggle,
+  // since it isn't a recurring price in Paddle.
+  const entryPass = plans?.find(
+    (p: SubscriptionPlan) => p.is_one_time_purchase || p.billing_cycle === 'lifetime'
+  );
+
+  const allVisiblePlans: SubscriptionPlan[] = entryPass
+    ? [...recurringPlans, entryPass]
+    : recurringPlans;
 
   // Listen for Paddle checkout events
   useEffect(() => {
@@ -111,12 +99,10 @@ export function PlanCards() {
 
     if (!on) return;
 
-    // Success event
     const handleCompleted = (data: any) => {
       console.log('Checkout completed:', data);
       setIsSuccess(true);
 
-      // Invalidate queries to refresh the user's status immediately
       queryClient.invalidateQueries({ queryKey: ['subscription-active'] });
       queryClient.invalidateQueries({ queryKey: ['subscription-credits'] });
 
@@ -124,7 +110,6 @@ export function PlanCards() {
         duration: 5000,
       });
 
-      // Set a timer for the automatic redirect
       if (redirectTimerRef.current) {
         clearTimeout(redirectTimerRef.current);
       }
@@ -134,10 +119,7 @@ export function PlanCards() {
       }, 5000);
     };
 
-    // Closed event
     const handleClosed = () => {
-      // If payment was already successful, redirect immediately on close
-      // instead of waiting for the 5s timer
       if (isSuccess) {
         router.push('/app/blogs/new');
       }
@@ -151,7 +133,6 @@ export function PlanCards() {
         off.call(checkoutInstance ?? paddle, 'checkout.completed', handleCompleted);
         off.call(checkoutInstance ?? paddle, 'checkout.closed', handleClosed);
       }
-
       if (redirectTimerRef.current) {
         clearTimeout(redirectTimerRef.current);
         redirectTimerRef.current = null;
@@ -170,9 +151,7 @@ export function PlanCards() {
       });
 
       if (result.transaction_id && paddle) {
-        paddle.Checkout.open({
-          transactionId: result.transaction_id,
-        });
+        paddle.Checkout.open({ transactionId: result.transaction_id });
       } else if (result.checkout_url) {
         window.open(result.checkout_url, '_blank');
       }
@@ -181,11 +160,15 @@ export function PlanCards() {
     }
   };
 
+  const scrollByCard = (dir: 1 | -1) => {
+    scrollRef.current?.scrollBy({ left: dir * 360, behavior: 'smooth' });
+  };
+
   if (isLoading) {
     return (
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {[1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-[450px] rounded-2xl" />
+      <div className="flex gap-5 overflow-x-hidden">
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-[620px] w-[320px] shrink-0 rounded-[3rem]" />
         ))}
       </div>
     );
@@ -193,222 +176,270 @@ export function PlanCards() {
 
   return (
     <div className="space-y-10">
-      {/* Billing cycle toggle */}
-      <div className="flex items-center justify-center">
-        <div className="flex items-center gap-3 rounded-full bg-muted/30 p-1.5 backdrop-blur-sm border border-border/50 shadow-sm">
-          <button
-            onClick={() => setCycle('monthly')}
-            className={`relative px-5 py-2 text-sm font-medium transition-all duration-200 rounded-full ${
-              cycle === 'monthly'
-                ? 'bg-background text-foreground shadow-md'
-                : 'text-muted-foreground hover:text-foreground'
+      {/* Billing cycle toggle — matches the marketing page */}
+      <div className="flex items-center justify-center gap-6">
+        <span
+          className={`text-sm font-black uppercase tracking-widest transition-colors ${
+            cycle === 'monthly' ? 'text-indigo-600' : 'text-muted-foreground'
+          }`}
+        >
+          Monthly
+        </span>
+        <button
+          onClick={() => setCycle(cycle === 'monthly' ? 'yearly' : 'monthly')}
+          className="relative h-8 w-16 rounded-full bg-muted p-1 transition-colors hover:bg-muted/70"
+        >
+          <div
+            className={`h-6 w-6 rounded-full bg-indigo-600 shadow-md transition-transform duration-300 ${
+              cycle === 'yearly' ? 'translate-x-8' : 'translate-x-0'
             }`}
-          >
-            Monthly
-          </button>
-          <button
-            onClick={() => setCycle('yearly')}
-            className={`relative px-5 py-2 text-sm font-medium transition-all duration-200 rounded-full flex items-center gap-2 ${
-              cycle === 'yearly'
-                ? 'bg-background text-foreground shadow-md'
-                : 'text-muted-foreground hover:text-foreground'
+          />
+        </button>
+        <div className="flex items-center gap-3">
+          <span
+            className={`text-sm font-black uppercase tracking-widest transition-colors ${
+              cycle === 'yearly' ? 'text-indigo-600' : 'text-muted-foreground'
             }`}
           >
             Yearly
-            <Badge
-              variant="secondary"
-              className="bg-primary/10 text-primary hover:bg-primary/20 border-none px-1.5 py-0 text-[10px] font-bold"
-            >
-              -20%
-            </Badge>
-          </button>
+          </span>
+          <span className="rounded-full border border-emerald-200 bg-emerald-100 px-3 py-1 text-[10px] font-black uppercase text-emerald-600">
+            2 Months Free
+          </span>
         </div>
       </div>
 
-      {/* Plan cards grid */}
-      <motion.div
-        variants={container}
-        initial="hidden"
-        animate="show"
-        className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
-      >
-        <AnimatePresence mode="wait">
-          {filteredPlans.map((plan: SubscriptionPlan) => {
-            const isCurrentPlan =
-              activeSub?.plan_details?.id === plan.id && activeSub?.is_active;
+      {/* Scrollable plan strip — every plan, including the one-time pass */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => scrollByCard(-1)}
+          className="absolute -left-3 top-1/2 z-20 hidden -translate-y-1/2 rounded-full border bg-background p-2 shadow-md hover:bg-muted md:flex"
+          aria-label="Scroll left"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => scrollByCard(1)}
+          className="absolute -right-3 top-1/2 z-20 hidden -translate-y-1/2 rounded-full border bg-background p-2 shadow-md hover:bg-muted md:flex"
+          aria-label="Scroll right"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
 
-            // Get overrides based on plan name (lowercase)
-            const override = planContentOverrides[plan.name.toLowerCase()];
+        <motion.div
+          ref={scrollRef}
+          variants={container}
+          initial="hidden"
+          animate="show"
+          className="flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-px-4 px-1 pb-6 pt-2 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-track]:bg-transparent"
+          style={{ scrollbarWidth: 'thin' }}
+        >
+          <AnimatePresence mode="popLayout">
+            {allVisiblePlans.map((plan: SubscriptionPlan) => {
+              const isCurrentPlan =
+                activeSub?.plan_details?.id === plan.id && activeSub?.is_active;
+              const isProcessing = processingPlanId === plan.id;
+              const highlights = getHighlights(plan);
+              const numericPrice = Number(plan.price);
 
-            const features = plan.features as Record<
-              string,
-              boolean | string
-            > | null;
-            const featureList = override?.features || (features
-              ? Object.entries(features)
-                  .filter(([, v]) => v === true || typeof v === 'string')
-                  .map(([k]) => k.replace(/_/g, ' '))
-              : []);
-
-            const isPremium = plan.is_featured;
-            const isProcessing = processingPlanId === plan.id;
-
-            return (
-              <motion.div
-                key={`${plan.id}-${cycle}`}
-                variants={item}
-                whileHover={{ y: -6, transition: { duration: 0.2 } }}
-                className="flex"
-              >
-                <Card
-                  className={`relative flex flex-col w-full overflow-hidden transition-all duration-300 border-2 rounded-2xl ${
-                    isPremium
-                      ? 'border-primary shadow-[0_15px_40px_rgba(var(--primary),0.12)] ring-1 ring-primary/10 bg-background/60 dark:bg-zinc-900/60'
-                      : 'border-border/50 hover:border-border shadow-md bg-background/40 hover:bg-background/80'
-                  } backdrop-blur-xl`}
-                >
-                  {isPremium && (
-                    <div className="absolute top-0 right-0">
-                      <div className="bg-primary text-primary-foreground text-[9px] font-bold px-7 py-0.5 rotate-45 translate-x-[28%] translate-y-[50%] shadow uppercase tracking-wider">
-                        Most Popular
+              // ---- One-time Entry Pass: dark, standalone card style ----
+              if (plan.is_one_time_purchase || plan.billing_cycle === 'lifetime') {
+                return (
+                  <motion.div
+                    key={plan.id}
+                    variants={item}
+                    className="group relative flex w-[300px] shrink-0 snap-center flex-col overflow-hidden rounded-[3rem] border-2 border-indigo-500 bg-slate-950 p-8 text-white shadow-[0_25px_60px_-15px_rgba(79,70,229,0.4)] transition-all duration-500 hover:-translate-y-2"
+                  >
+                    <div className="absolute right-0 top-0 p-6 opacity-10 transition-transform duration-500 group-hover:rotate-12">
+                      <Flame className="h-20 w-20 text-indigo-400" />
+                    </div>
+                    <div className="relative z-10 flex flex-1 flex-col">
+                      <div className="mb-6 inline-block self-start rounded-full bg-indigo-600 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest shadow-lg">
+                        Limited Pass
                       </div>
+                      <h3 className="mb-1 text-3xl font-black leading-none tracking-tighter">
+                        {shortName(plan.name)}
+                      </h3>
+                      <p className="mb-8 text-[11px] font-bold uppercase tracking-[0.1em] text-slate-400">
+                        Instant Entry License
+                      </p>
+                      <div className="relative mb-8 flex flex-col items-center justify-center rounded-[2.25rem] border border-white/10 bg-white/5 py-10 text-center shadow-2xl transition-colors group-hover:bg-white/10">
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-2xl font-black text-indigo-400">$</span>
+                          <span className="text-7xl font-black leading-none tracking-tighter text-white drop-shadow-2xl">
+                            {numericPrice}
+                          </span>
+                        </div>
+                        <div className="mb-1 mt-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                          one-time
+                        </div>
+                        <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-indigo-600 px-5 py-1.5 text-[9px] font-black uppercase tracking-widest shadow-lg">
+                          One-Time Activation
+                        </div>
+                      </div>
+                      <div className="mb-8 mt-4 space-y-4 px-1">
+                        {highlights.map((f, idx) => (
+                          <div key={f} className="flex items-center gap-3">
+                            {idx === 0 ? (
+                              <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-400" />
+                            ) : idx === 1 ? (
+                              <Zap className="h-4 w-4 shrink-0 text-indigo-400" />
+                            ) : (
+                              <ShieldCheck className="h-4 w-4 shrink-0 text-indigo-400" />
+                            )}
+                            <span className="text-xs font-bold leading-tight text-slate-200 capitalize">
+                              {f}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      {isCurrentPlan ? (
+                        <button
+                          disabled
+                          className="mt-auto w-full rounded-[1.5rem] border border-dashed border-white/30 py-5 text-[11px] font-black uppercase tracking-[0.3em] text-slate-400"
+                        >
+                          Active
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleSubscribe(plan)}
+                          disabled={isProcessing}
+                          className="mt-auto w-full rounded-[1.5rem] bg-white py-5 text-[11px] font-black uppercase tracking-[0.3em] text-slate-900 shadow-2xl transition-all hover:bg-indigo-600 hover:text-white disabled:opacity-60"
+                        >
+                          {isProcessing ? 'Processing...' : `Get Pass for $${numericPrice}`}
+                        </button>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              }
+
+              // ---- Recurring plans: Pro / Growth / Agency ----
+              const isPopular = plan.is_featured;
+              const monthlyEquivalent =
+                cycle === 'yearly' ? Math.floor(numericPrice / 12) : numericPrice;
+
+              return (
+                <motion.div
+                  key={`${plan.id}-${cycle}`}
+                  variants={item}
+                  whileHover={{ y: -6, transition: { duration: 0.2 } }}
+                  className={`relative flex w-[300px] shrink-0 snap-center flex-col rounded-[3rem] border bg-background px-7 pb-10 pt-14 transition-all duration-500 ${
+                    isPopular
+                      ? 'border-indigo-600 shadow-2xl shadow-indigo-500/10 ring-4 ring-indigo-500/5'
+                      : 'border-border shadow-lg'
+                  }`}
+                >
+                  {isPopular && (
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-indigo-600 px-5 py-1.5 text-[9px] font-black uppercase tracking-widest text-white shadow-lg">
+                      Most Popular
                     </div>
                   )}
 
-                  <CardHeader className="pb-3 px-5 pt-5">
-                    <div className="flex items-center gap-2 mb-1">
-                      {isPremium ? (
-                        <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
-                          <Zap size={15} />
+                  <div className="mb-8 text-center">
+                    <h3 className="mb-1 text-2xl font-black tracking-tight">
+                      {shortName(plan.name)}
+                    </h3>
+                    <p className="mb-6 min-h-[28px] text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      {plan.description}
+                    </p>
+
+                    <div className="flex flex-col items-center">
+                      <div className="mb-1 flex items-center justify-center gap-1">
+                        <span className="text-lg font-black text-muted-foreground">$</span>
+                        <span className="text-6xl font-black leading-none tracking-tighter">
+                          {numericPrice}
+                        </span>
+                      </div>
+
+                      {cycle === 'monthly' ? (
+                        <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                          per month
                         </div>
                       ) : (
-                        <div className="p-1.5 rounded-lg bg-muted text-muted-foreground">
-                          <Sparkles size={15} />
+                        <div className="mb-3 flex flex-col items-center gap-0.5">
+                          <div className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600">
+                            Billed Yearly
+                          </div>
+                          <div className="text-[11px] font-medium leading-none text-muted-foreground">
+                            (~ ${monthlyEquivalent}/month)
+                          </div>
                         </div>
                       )}
-                      <CardTitle className="text-lg font-bold tracking-tight">
-                        {plan.name}
-                      </CardTitle>
-                    </div>
-                    <CardDescription className="text-xs min-h-[30px] leading-relaxed opacity-80">
-                      {plan.description}
-                    </CardDescription>
-                  </CardHeader>
 
-                  <CardContent className="flex-1 space-y-4 px-5">
-                    {/* Price */}
-                    <div className="flex items-baseline gap-2">
-                      {override?.originalPrice && (
-                        <span className="text-muted-foreground text-lg line-through opacity-30 font-medium">
-                          ${override.originalPrice}
-                        </span>
-                      )}
-                      <span className="text-4xl font-extrabold tracking-tighter">
-                        ${override?.price || plan.price}
-                      </span>
-                      <span className="text-muted-foreground text-[10px] font-medium opacity-60">
-                        / {plan.billing_cycle === 'monthly' ? 'mo' : 'yr'}
-                      </span>
+                      <div className="grid grid-cols-2 gap-2 rounded-xl border border-border/40 bg-indigo-50 px-3 py-2 dark:bg-indigo-500/10">
+                        <div className="text-center">
+                          <div className="text-[8px] font-black uppercase tracking-wider text-indigo-600/70">
+                            AI Credits
+                          </div>
+                          <div className="text-xs font-black text-indigo-700 dark:text-indigo-300">
+                            {plan.ai_credits.toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="border-l border-indigo-200 text-center dark:border-indigo-500/20">
+                          <div className="text-[8px] font-black uppercase tracking-wider text-indigo-600/70">
+                            Keywords
+                          </div>
+                          <div className="text-xs font-black text-indigo-700 dark:text-indigo-300">
+                            {plan.keyword_credits.toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
                     </div>
+                  </div>
 
-                    {/* Credits & Limits - Horizontal Bar */}
-                    <div
-                      className={`grid grid-cols-2 gap-2 rounded-xl border border-border/20 p-2.5 transition-colors ${
-                        isPremium ? 'bg-primary/5' : 'bg-muted/30'
+                  <ul className="mb-10 flex-1 space-y-4 border-t border-border/50 pt-8">
+                    {highlights.map((f) => (
+                      <li
+                        key={f}
+                        className="flex items-start gap-3 text-[11px] font-bold leading-tight text-muted-foreground capitalize"
+                      >
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-600" />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+
+                  {isCurrentPlan ? (
+                    <button
+                      disabled
+                      className="w-full rounded-[1.75rem] border border-dashed py-5 text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground"
+                    >
+                      Active Plan
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleSubscribe(plan)}
+                      disabled={isProcessing}
+                      className={`w-full rounded-[1.75rem] py-5 text-[10px] font-black uppercase tracking-[0.3em] transition-all disabled:opacity-60 ${
+                        isPopular
+                          ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-500/20 hover:bg-indigo-700'
+                          : 'bg-foreground text-background hover:bg-foreground/90'
                       }`}
                     >
-                      <div>
-                        <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
-                          Tokens
-                        </div>
-                        <div className="text-xs font-bold">
-                          {override?.tokens?.split(' ')[0] || plan.ai_credits.toLocaleString()}
-                        </div>
-                      </div>
-                      <div className="border-l border-border/30 pl-2.5">
-                        <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">
-                          Keywords
-                        </div>
-                        <div className="text-xs font-bold">
-                          {override?.keywords?.split(' ')[0] || plan.keyword_credits.toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
+                      {isProcessing ? 'Processing...' : `Get ${shortName(plan.name)}`}
+                    </button>
+                  )}
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        </motion.div>
 
-                    {/* Features - Grid */}
-                    <div className="space-y-2.5">
-                      <h4 className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50 flex items-center gap-2">
-                        Features
-                        <div className="h-px bg-border/20 flex-1" />
-                      </h4>
-                      {featureList.length > 0 && (
-                        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5">
-                          {featureList.map((feature: string) => (
-                            <li
-                              key={feature}
-                              className="flex items-center gap-1.5 text-[10px] group"
-                            >
-                              <div
-                                className={`rounded-full p-0.5 shrink-0 ${
-                                  isPremium
-                                    ? 'bg-primary/10 text-primary'
-                                    : 'bg-muted/60 text-muted-foreground/70'
-                                }`}
-                              >
-                                <Check className="h-2 w-2" strokeWidth={4} />
-                              </div>
-                              <span className="capitalize truncate leading-tight group-hover:text-foreground transition-colors">
-                                {feature}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  </CardContent>
+        <p className="mt-1 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 md:hidden">
+          ← Swipe to see all plans →
+        </p>
+      </div>
 
-                  <CardFooter className="pt-2 pb-5 px-5">
-                    {isCurrentPlan ? (
-                      <Button
-                        className="w-full h-9 rounded-lg border-dashed text-[10px]"
-                        variant="secondary"
-                        disabled
-                      >
-                        Active Plan
-                      </Button>
-                    ) : (
-                      <Button
-                        className={`w-full h-9 rounded-lg text-[10px] font-bold shadow-sm transition-all active:scale-95 group overflow-hidden ${
-                          isPremium
-                            ? 'bg-primary text-primary-foreground hover:bg-primary/95'
-                            : 'bg-foreground text-background hover:bg-foreground/90'
-                        }`}
-                        onClick={() => handleSubscribe(plan)}
-                        disabled={isProcessing}
-                      >
-                        <span className="relative z-10 flex items-center justify-center gap-1.5">
-                          {isProcessing ? 'Processing...' : (override?.buttonText || 'Upgrade')}
-                          {!isProcessing && (
-                            <Zap className="w-3 h-3 fill-current group-hover:scale-110 transition-transform" />
-                          )}
-                        </span>
-                      </Button>
-                    )}
-                  </CardFooter>
-                </Card>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-      </motion.div>
-
-      {filteredPlans.length === 0 && !isLoading && (
+      {allVisiblePlans.length === 0 && !isLoading && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="text-center py-20 bg-muted/20 rounded-3xl border border-dashed border-border"
+          className="rounded-3xl border border-dashed border-border bg-muted/20 py-20 text-center"
         >
-          <p className="text-muted-foreground font-medium">
+          <p className="font-medium text-muted-foreground">
             No plans available for {cycle} billing.
           </p>
         </motion.div>

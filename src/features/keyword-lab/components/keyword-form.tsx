@@ -39,6 +39,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { KeyLabTable } from '@/features/keyword-lab/components/keylab-table';
 import {
   Country,
+  type CountrySearchResult,
   type KeywordSuggestion,
   Location,
   type SearchParams,
@@ -181,12 +182,22 @@ export function KeywordForm({ onSearchComplete, onAddKeywords }: KeywordFormProp
   const locationSelectDisabled =
     !selectedCountry || countryLocationCode == null || isLocationsLoading;
 
+  // Backend diagnostic message when an on-demand DataForSEO country fetch
+  // fails (e.g. credentials, network, or DataForSEO having no data for that
+  // country) — shown directly in the UI so no server/log access is needed.
+  const countryFetchDiagnostic =
+    Array.isArray(countryDetails) && countryDetails.length === 0
+      ? (countryDetails as CountrySearchResult)._apiMessage
+      : undefined;
+
   const locationButtonLabel = (() => {
     if (!selectedCountry) return 'Select a country first';
     if (countryLocationCode == null) {
       if (isCountryLoading || isCountryFetching) return 'Loading country...';
       if (countryError) return 'Could not load country';
-      if (Array.isArray(countryDetails) && countryDetails.length === 0) return 'Country not in database';
+      if (Array.isArray(countryDetails) && countryDetails.length === 0) {
+        return countryFetchDiagnostic ? 'Could not fetch this country — see message' : 'Country not in database';
+      }
       return 'Select a country first';
     }
     if (isLocationsLoading) return 'Loading...';
@@ -208,6 +219,28 @@ export function KeywordForm({ onSearchComplete, onAddKeywords }: KeywordFormProp
     }
   }, [locationsError]);
 
+  // Same idea for the locations endpoint: if the country exists but its
+  // on-demand DataForSEO location fetch failed, show exactly why.
+  useEffect(() => {
+    if (locationsData?.syncError) {
+      console.error('Location sync diagnostic:', locationsData.syncError);
+      toast.error(locationsData.syncError, { duration: 8000 });
+    }
+  }, [locationsData?.syncError]);
+
+  // Show the exact backend/DataForSEO diagnostic message the moment an
+  // on-demand country fetch comes back empty — this is the only signal the
+  // person gets, so it needs to explain *why* (bad credentials, network
+  // blocked, DataForSEO has no data for this country, etc.) rather than a
+  // generic "not found".
+  useEffect(() => {
+    if (countryFetchDiagnostic) {
+      console.error('Country fetch diagnostic:', countryFetchDiagnostic);
+      toast.error(countryFetchDiagnostic, { duration: 8000 });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countryFetchDiagnostic]);
+
   const { mutate: searchKeywords, isPending: isSearching } = useKeywordSearch();
   const { mutate: saveKeywordCollection, isPending: isSavingCollection } =
     useSaveKeywordCollection();
@@ -219,6 +252,22 @@ export function KeywordForm({ onSearchComplete, onAddKeywords }: KeywordFormProp
   useEffect(() => {
     if (countryDetails?.[0]) {
       const countryData = countryDetails[0];
+
+      // Defense-in-depth: never trust the API result blindly. If we searched by
+      // ISO code, make sure the result's ISO code actually matches — a backend
+      // fallback search could otherwise return an unrelated country (e.g.
+      // searching "AF" for Afghanistan matching "South Africa" via a fuzzy
+      // name search) and we'd silently show the wrong country's locations.
+      const expectedIso = selectedCountry?.country_iso_code?.trim().toUpperCase();
+      const returnedIso = countryData.country_iso_code?.trim().toUpperCase();
+      if (expectedIso && returnedIso && expectedIso !== returnedIso) {
+        console.error(
+          `Country mismatch: expected ISO "${expectedIso}" but API returned "${returnedIso}" ` +
+          `(${countryData.location_name}). Ignoring this result.`
+        );
+        return;
+      }
+
       const countryLocationCode = countryData.location_code;
 
       setSelectedCountry((prev) => ({
